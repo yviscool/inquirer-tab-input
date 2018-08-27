@@ -1,0 +1,27 @@
+{
+    "name": "inquirer-tab-plus",
+    "version": "1.0.0",
+    "description": "autocomplete prompt input",
+    "main": "index.js",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yviscool/inquirer-tab-plus.git"
+    },
+    "keywords": [
+        "inquirer",
+        "number",
+        "command",
+        "prompt",
+        "stdin",
+        "cli",
+        "tty",
+        "menu"
+    ],
+    "author": "Y.V",
+    "dependencies": {
+        "inquirer": "^6.0.0"
+    },
+    "devDependencies": {
+        "fuzzy": "^0.1.3"
+    }
+}
