@@ -30,7 +30,7 @@ class InputPrompt extends Base {
     }
 
     this.opt = _.defaults(_.clone(this.opt), {
-      bgcolor: chalk.bgBlue,
+      bgcolor: chalk.bgCyan.bind(chalk),
       // pointerBgColor: chalk.bgred,
 
     })
@@ -109,7 +109,7 @@ class InputPrompt extends Base {
       message += isFinal ? chalk.cyan(appendContent) : appendContent;
     }
 
-    require('fs').writeFileSync('xx.txt', message);
+    // require('fs').writeFileSync('xx.txt', message);
 
     this.questionLength = stringWidth(message);
 
@@ -117,10 +117,8 @@ class InputPrompt extends Base {
 
       var choicesStr = this.renderChoices(this.choices, this.pointer);
 
-      var indexPosition = this.choices.indexOf(
-          this.choices.getChoice(this.pointer)
-      );
-      // add 
+      var indexPosition = this.choices.indexOf(this.choices.getChoice(this.pointer) ); 
+      // add
       var realChoiceStr = this.paginator.paginate(choicesStr, indexPosition, this.opt.pageSize);
       var changed = choicesStr !== realChoiceStr;
       if (changed) {
@@ -145,14 +143,15 @@ class InputPrompt extends Base {
 
   renderChoices(choices, pointer) {
     var self = this;
+    var defaultBgColor = self.opt.bgcolor;
     var output = [];
-    var spaceOffset = this.questionLength;
-    var space = Array.apply(null, {length: Math.floor(spaceOffset)}).fill(' ').join('');
+    var questionAppendSpace = " ".repeat(this.questionLength) 
     var separatorOffset = 0;
     var maxChoiceLength = 0;
-    var currentPointer = 0;
+    // var currentPointer = 0;
     choices.forEach(function(choice, index) {
 
+      var message;
       // Is a separator
       if (choice.type === 'separator') {
 
@@ -168,58 +167,55 @@ class InputPrompt extends Base {
       if (choice.disabled) {
 
         separatorOffset++;
-        var message = choice.name + ' (' + (_.isString(choice.disabled) ? choice.disabled : 'Disabled') + ')';
-          output.push(
-              space + 
-              self.opt.bgcolor(' ' + message)
-          )
+
+        message = choice.name + ' (' + (_.isString(choice.disabled) ? choice.disabled : 'Disabled') + ')';
+
+        output.push(questionAppendSpace + defaultBgColor(' ' + message))
 
         return;
 
       }
-      var message;
+
       // Is the current choice is the selected choice
       if (index - separatorOffset === pointer) {
-        currentPointer = separatorOffset;
-        message = choice.name;
+        // currentPointer = separatorOffset;
+        message = chalk.bgRed( ' ' + chalk.black(choice.name) + ' ');
+      } else {
+        message = defaultBgColor( ' ' +  chalk.white(choice.name) + ' ');
       }
 
-      message = choice.name;
-      output.push(
-          space + 
-          self.opt.bgcolor(' ' + message)
-      )
+      output.push(questionAppendSpace + message);
 
     });
 
+    // 查找最长的 choice 方便统一 背景长度
     var maxChoiceLength = _.max(_.map(output, stringWidth));
 
     this.maxChoiceLength = maxChoiceLength;
 
-    // 为 choice 追加空格，背景，指示背景
+    // 为 choice 追加空格  
     output = _.map(output, (message, index) => {
       var messageLength = stringWidth(message);
+      // 如果 该 choice 小于 最大的 choice 则追加空格
       if (messageLength < maxChoiceLength) {
-        message = message + 
-        self.opt.bgcolor(
-          Array.apply(null, {
-            length: maxChoiceLength - messageLength
-          })
-          .fill(' ')
-          .join('')
-        ) 
+        if (index - separatorOffset === pointer) {
+          return message + chalk.bgRed(' '.repeat(maxChoiceLength - messageLength )) + chalk.bgYellow(' ');
+        }
+        message = message + defaultBgColor(' '.repeat(maxChoiceLength - messageLength));
+      } else if (messageLength === maxChoiceLength){
+        if (index - separatorOffset === pointer){
+          return message + chalk.bgYellow(' ');
+        }
       }
-      if (index - currentPointer === pointer) {
-        return chalk.gray(message + chalk.bgRed(' '))
-      }
-      return message + chalk.bgWhite(' ')
+      // 增加方块 指示
+      return message + chalk.bgWhite(' ');
     })
-    output = output.join('\n')
+    output = output.join('\n');
+    // 替代最后一个 \n 
     return output.replace(/\n$/, '');
   }
 
   executeSource() {
-    var self = this;
     var sourcePromise = this.opt.source(this.answers, this.rl.line);
 
     if (!(sourcePromise instanceof Promise)){
@@ -227,8 +223,8 @@ class InputPrompt extends Base {
     }
 
     sourcePromise.then(choices => {
-      self.choices = new Choices(choices, self.answers);
-      self.render();
+      this.choices = new Choices(choices, this.answers);
+      this.render();
     })
 
     return sourcePromise;
@@ -277,35 +273,52 @@ class InputPrompt extends Base {
   }
 
   onTabKey() {
-    var self = this;
     // this.rl.line = this.choices.getChoice(0);
     this.executeSource().then(result =>{
-      var len = self.choices.realLength;
-      self.pointer = this.pointer < len - 1 ? this.pointer + 1 : 0;
-      self.rl.line = self.choices.getChoice(self.pointer).name;
+      var len = this.choices.realLength;
+      this.pointer = this.pointer < len - 1 ? this.pointer + 1 : 0;
+
+
+      // this._insertString(lines[i]);
+
+
+      this.rl._deleteLineLeft();
+      var str = this.rl.line + this.choices.getChoice(this.pointer).name;
+
+      // ctrl + u
+
+      for (var str of str) {
+        this.rl._insertString(str); 
+      }
+      // self.rl.line = self.choices.getChoice(self.pointer).name;
       // var a = this.rl._getCursorPos()
       // require('fs').writeFileSync('xx.txt',`${a.cols} ${a.rows}`);
-      self.render()
+      this.render();
     })
   }
 
 
   screenRender(content, bottomContent) {
-    this.clean();
-    this.height = content.split('\n').length;
+
 
     if (this.firstRender){
       this.rl.output.write(content);
       return;
     }
 
-    // this.height = content.split('\n').length;
-    this.rl.output.write(content);
-    if (this.maxChoiceLength > this.questionLength){
-      this.resetCursor(this.maxChoiceLength - this.questionLength);
-    } else if (this.maxChoiceLength < this.questionLength){
 
+
+    this.height = content.split('\n').length;
+
+    // this.rl._refreshLine();
+    // this.height = content.split('\n').length;
+    this.clean();
+    this.rl.output.write(content);
+
+    if (this.maxChoiceLength > this.questionLength){
+      this.resetCursor(this.maxChoiceLength - this.questionLength, this.height - 1);
     }
+     // else if (this.maxChoiceLength < this.questionLength){}
   }
 
   clean(){
@@ -314,9 +327,9 @@ class InputPrompt extends Base {
   }
 
 
-  resetCursor(x){
-    util.up(this.rl, this.height + 1);
-    util.left(this.rl, x + 1)
+  resetCursor(x, y){
+    util.left(this.rl, x + 1 )
+    util.up(this.rl, y)
   }
 
 
